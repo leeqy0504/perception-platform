@@ -14,7 +14,7 @@
 2. `sam2_video_propagation` —— 将掩码传播到整个 RGB 视频帧序列。
 3. `mask_qa` —— 计算掩码对应的检测框，并标记可疑帧。
 4. `review_pack` —— 生成本地 HTML 审核包。
-5. `detection_dataset_export` —— 导出 COCO `annotations.json`、复制图片、导出掩码以及预览图。
+5. `detection_dataset_export` —— 导出 UniTrain 推荐的 COCO 数据集、复制图片、导出掩码以及预览图。
 
 整个流程无需 Web 服务或前端界面。
 
@@ -66,6 +66,8 @@ detection_dataset:
   class_name: object
   class_id: 0
   min_box_area: 16
+  clip_size: 500
+  train_ratio: 0.8
 output_dir: output/
 ```
 
@@ -134,21 +136,54 @@ output/<task_name>/runs/<run_id>/stages/
 
 请确保 `sam2.container` 指定的 Docker 容器将项目目录挂载到上述相同路径；如果挂载路径不同，请修改配置中的 `sam2.project_mount`。
 
-## COCO 输出
+## UniTrain COCO 输出
 
-导出目录中的 `annotations.json` 使用 COCO detection JSON 结构：
+导出目录使用 UniTrain 推荐的 COCO 数据集结构。导出前会先按连续帧切 clip，再按 clip 划分：
+
+```text
+clip_001: frame 000001-000500
+clip_002: frame 000501-001000
+clip_003: frame 001001-001500
+...
+```
+
+默认 `clip_size: 500`，`train_ratio: 0.8`，即 80% clips 进入 `train/`，20% clips 进入 `valid/`。同一个 clip 内的连续帧不会被拆到不同 split。
 
 ```text
 output/<task_name>/detection_dataset_export/
-  annotations.json
-  images/*.png
+  train/
+    *.png
+    _annotations.coco.json
+  valid/
+    *.png
+    _annotations.coco.json
   masks/*.png
   preview/*.svg
   contact_sheet.svg
 ```
 
-每个 annotation 包含：
+训练配置可指向 `detection_dataset_export/`：
+
+```yaml
+data:
+  path: /path/to/output/<task_name>/detection_dataset_export
+  format: coco
+```
+
+每个 split 的 `_annotations.coco.json` 至少包含 COCO 标准字段：
+
+* `images`
+* `annotations`
+* `categories`
+
+每个 annotation 包含 detection 与 segmentation 所需字段：
 
 * `bbox`: COCO `[x, y, width, height]`
 * `segmentation`: COCO uncompressed RLE，包含 `size` 和 `counts`
-* `iscrowd`: `1`
+* `area`
+* `iscrowd`: `0`
+
+因此同一份导出可用于：
+
+* `task: detect`：读取 `bbox`
+* `task: segment`：读取 `segmentation`

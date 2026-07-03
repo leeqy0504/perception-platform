@@ -265,6 +265,26 @@ def _mask_to_coco_rle(path: Path) -> dict:
     return {"size": [height, width], "counts": counts}
 
 
+def _split_by_clips(frames: list[dict], clip_size: int, train_ratio: float) -> dict[str, str]:
+    clip_size = max(1, int(clip_size or 500))
+    train_ratio = max(0.0, min(1.0, float(train_ratio)))
+    clips = [frames[i:i + clip_size] for i in range(0, len(frames), clip_size)]
+    if not clips:
+        return {}
+    train_clip_count = int(len(clips) * train_ratio)
+    if len(clips) == 1:
+        train_clip_count = 1
+    else:
+        train_clip_count = min(len(clips) - 1, max(1, train_clip_count))
+
+    split_by_frame = {}
+    for clip_index, clip in enumerate(clips):
+        split = "train" if clip_index < train_clip_count else "valid"
+        for row in clip:
+            split_by_frame[row["frame"]] = split
+    return split_by_frame
+
+
 def _state_from_review(row: dict, review_frames: dict) -> str:
     return review_frames.get(row["frame"], {}).get("state", row["state"])
 
@@ -466,12 +486,18 @@ class ReviewPackStage(BaseStage):
         rgb_dir = task_dir / "rgb"
         masks_source = Path(report["source_masks"])
         export_dir = output_dir.parent / "detection_dataset_export"
+        split_by_frame = _split_by_clips(
+            report["frames"],
+            config.detection_dataset.clip_size,
+            config.detection_dataset.train_ratio,
+        )
 
         items = []
         for row in report["frames"]:
+            split_name = split_by_frame.get(row["frame"], "train")
             image_path = rgb_dir / row["frame"]
             mask_path = masks_source / row["frame"]
-            export_image = export_dir / "images" / row["frame"]
+            export_image = export_dir / split_name / row["frame"]
             export_mask = export_dir / "masks" / row["frame"]
             export_preview = export_dir / "preview" / f"{Path(row['frame']).stem}.svg"
             item = {
@@ -609,48 +635,74 @@ class DetectionDatasetExportStage(BaseStage):
         review_frames = review.get("frames", {})
         rgb_dir = Path(config.input.rgbd_dir) / "rgb"
         masks_dir = Path(report["source_masks"])
-        images_out = output_dir / "images"
+        split_names = ("train", "valid")
+        split_dirs = {name: output_dir / name for name in split_names}
         masks_out = output_dir / "masks"
         preview_out = output_dir / "preview"
         contact_sheet_path = output_dir / "contact_sheet.svg"
-        for stale_dir in (images_out, output_dir / "labels", masks_out, preview_out):
+        for stale_dir in (
+            split_dirs["train"],
+            split_dirs["valid"],
+            output_dir / "images",
+            output_dir / "labels",
+            masks_out,
+            preview_out,
+            output_dir / "test",
+        ):
             if stale_dir.exists():
                 shutil.rmtree(stale_dir)
         if contact_sheet_path.exists():
             contact_sheet_path.unlink()
+        old_annotations_path = output_dir / "annotations.json"
+        if old_annotations_path.exists():
+            old_annotations_path.unlink()
         dataset_yaml_path = output_dir / "dataset.yaml"
         if dataset_yaml_path.exists():
             dataset_yaml_path.unlink()
-        images_out.mkdir(exist_ok=True)
+        for split_dir in split_dirs.values():
+            split_dir.mkdir(exist_ok=True)
         masks_out.mkdir(exist_ok=True)
         preview_out.mkdir(exist_ok=True)
 
-        images = []
-        annotations = []
+        coco_by_split = {
+            name: {
+                "images": [],
+                "annotations": [],
+                "next_image_id": 1,
+                "next_annotation_id": 1,
+            }
+            for name in split_names
+        }
         skipped = []
         contact_items = []
-        image_id = 1
-        annotation_id = 1
+        split_by_frame = _split_by_clips(
+            report["frames"],
+            config.detection_dataset.clip_size,
+            config.detection_dataset.train_ratio,
+        )
         for row in report["frames"]:
             frame = row["frame"]
+            split_name = split_by_frame.get(frame, "train")
+            split_out = split_dirs[split_name]
+            split_coco = coco_by_split[split_name]
             review_state = review_frames.get(frame, {}).get("state", row["state"])
             if review_state == "rejected":
-                skipped.append({"image": frame, "reason": "rejected"})
+                skipped.append({"image": frame, "reason": "rejected", "split": split_name})
                 continue
             if not row.get("bbox_xyxy"):
-                skipped.append({"image": frame, "reason": "missing_bbox"})
+                skipped.append({"image": frame, "reason": "missing_bbox", "split": split_name})
                 continue
 
             image_path = rgb_dir / frame
             mask_path = masks_dir / frame
             if not image_path.exists():
-                skipped.append({"image": frame, "reason": "missing_image"})
+                skipped.append({"image": frame, "reason": "missing_image", "split": split_name})
                 continue
             if not mask_path.exists():
-                skipped.append({"image": frame, "reason": "missing_mask"})
+                skipped.append({"image": frame, "reason": "missing_mask", "split": split_name})
                 continue
 
-            dst_image = images_out / frame
+            dst_image = split_out / frame
             dst_mask = masks_out / frame
             if config.detection_dataset.copy_images:
                 shutil.copy2(image_path, dst_image)
@@ -677,20 +729,22 @@ class DetectionDatasetExportStage(BaseStage):
                 "state": review_state,
                 "preview_rel": _relpath(output_dir, preview_path),
             })
-            images.append({
+            image_id = split_coco["next_image_id"]
+            annotation_id = split_coco["next_annotation_id"]
+            split_coco["images"].append({
                 "id": image_id,
-                "file_name": _relpath(output_dir, dst_image),
+                "file_name": dst_image.name,
                 "width": width,
                 "height": height,
             })
-            annotations.append({
+            split_coco["annotations"].append({
                 "id": annotation_id,
                 "image_id": image_id,
                 "category_id": int(config.detection_dataset.class_id),
                 "segmentation": segmentation,
                 "area": int(coco_bbox[2] * coco_bbox[3]),
                 "bbox": coco_bbox,
-                "iscrowd": 1,
+                "iscrowd": 0,
                 "source": {
                     "image": str(dst_image),
                     "mask": str(dst_mask),
@@ -701,32 +755,39 @@ class DetectionDatasetExportStage(BaseStage):
                     "flags": row.get("flags", []),
                 },
             })
-            image_id += 1
-            annotation_id += 1
+            split_coco["next_image_id"] += 1
+            split_coco["next_annotation_id"] += 1
 
         _write_contact_sheet_svg(contact_items, contact_sheet_path)
-        _write_json(output_dir / "annotations.json", {
-            "info": {
-                "description": f"{config.task} annotation dataset",
-                "version": "1.0",
-            },
-            "licenses": [],
-            "images": images,
-            "annotations": annotations,
-            "categories": [{
-                "id": int(config.detection_dataset.class_id),
-                "name": config.detection_dataset.class_name,
-                "supercategory": "object",
-            }],
-            "metadata": {
-                "task": config.task,
-                "format": "coco",
-                "source": "sam2_masks",
-                "class_id": int(config.detection_dataset.class_id),
-                "class_name": config.detection_dataset.class_name,
-                "count": len(annotations),
-                "contact_sheet": str(contact_sheet_path),
-                "skipped": skipped,
-            },
-        })
+        categories = [{
+            "id": int(config.detection_dataset.class_id),
+            "name": config.detection_dataset.class_name,
+            "supercategory": "object",
+        }]
+        for split_name in split_names:
+            split_coco = coco_by_split[split_name]
+            split_skipped = [item for item in skipped if item.get("split") == split_name]
+            _write_json(split_dirs[split_name] / "_annotations.coco.json", {
+                "info": {
+                    "description": f"{config.task} {split_name} annotation dataset",
+                    "version": "1.0",
+                },
+                "licenses": [],
+                "images": split_coco["images"],
+                "annotations": split_coco["annotations"],
+                "categories": categories,
+                "metadata": {
+                    "task": config.task,
+                    "format": "coco",
+                    "source": "sam2_masks",
+                    "class_id": int(config.detection_dataset.class_id),
+                    "class_name": config.detection_dataset.class_name,
+                    "count": len(split_coco["annotations"]),
+                    "contact_sheet": str(contact_sheet_path),
+                    "skipped": split_skipped,
+                    "split": split_name,
+                    "clip_size": max(1, int(config.detection_dataset.clip_size or 500)),
+                    "train_ratio": float(config.detection_dataset.train_ratio),
+                },
+            })
         return output_dir

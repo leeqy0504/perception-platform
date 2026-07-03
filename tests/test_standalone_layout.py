@@ -28,6 +28,9 @@ input:
 sam2:
   points: [[10, 20]]
   labels: [1]
+detection_dataset:
+  clip_size: 500
+  train_ratio: 0.8
 output_dir: output/
 """,
         encoding="utf-8",
@@ -49,6 +52,8 @@ output_dir: output/
     assert config.sam2.container == "sam2-backend-1"
     assert config.sam2.project_mount == "/home/try/code/annotation_dataset"
     assert config.detection_dataset.class_name == "object"
+    assert config.detection_dataset.clip_size == 500
+    assert config.detection_dataset.train_ratio == 0.8
 
 
 def test_only_annotation_dataset_runtime_stages_are_registered():

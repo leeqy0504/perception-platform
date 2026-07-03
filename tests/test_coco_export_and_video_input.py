@@ -84,11 +84,11 @@ def test_detection_dataset_export_writes_coco_bbox_and_segmentation(tmp_path):
         context=_context_for(mask_qa_dir, output_dir),
     )
 
-    coco = json.loads((output_dir / "annotations.json").read_text(encoding="utf-8"))
-    assert coco["info"]["description"] == "mouse_001 annotation dataset"
+    coco = json.loads((output_dir / "train" / "_annotations.coco.json").read_text(encoding="utf-8"))
+    assert coco["info"]["description"] == "mouse_001 train annotation dataset"
     assert coco["images"] == [{
         "id": 1,
-        "file_name": "images/000000.png",
+        "file_name": "000000.png",
         "width": 4,
         "height": 3,
     }]
@@ -96,9 +96,61 @@ def test_detection_dataset_export_writes_coco_bbox_and_segmentation(tmp_path):
     assert coco["annotations"][0]["bbox"] == [1, 0, 2, 2]
     assert coco["annotations"][0]["area"] == 4
     assert coco["annotations"][0]["segmentation"] == {"size": [3, 4], "counts": [0, 12]}
-    assert coco["annotations"][0]["iscrowd"] == 1
+    assert coco["annotations"][0]["iscrowd"] == 0
+    assert (output_dir / "train" / "000000.png").exists()
+    assert not (output_dir / "annotations.json").exists()
+    assert not (output_dir / "images").exists()
     assert not (output_dir / "labels").exists()
     assert not (output_dir / "dataset.yaml").exists()
+
+
+def test_detection_dataset_export_splits_by_contiguous_clips(tmp_path):
+    task_dir = tmp_path / "tasks" / "mouse_001"
+    rgb_dir = task_dir / "rgb"
+    masks_dir = tmp_path / "sam2" / "masks"
+    mask_qa_dir = tmp_path / "mask_qa"
+    output_dir = tmp_path / "export"
+    frames = []
+    for index in range(6):
+        frame_name = f"{index:06d}.png"
+        frames.append({
+            "frame": frame_name,
+            "width": 4,
+            "height": 3,
+            "area": 4,
+            "bbox_xyxy": [1, 0, 3, 2],
+            "state": "accepted",
+            "flags": [],
+        })
+        _write_png(rgb_dir / frame_name)
+        _write_png(masks_dir / frame_name)
+    mask_qa_dir.mkdir(parents=True)
+    _write_json(mask_qa_dir / "qa_report.json", {
+        "task": "mouse_001",
+        "source_masks": str(masks_dir),
+        "frames": frames,
+    })
+    config = _minimal_config(task_dir)
+    config.detection_dataset.clip_size = 2
+    config.detection_dataset.train_ratio = 0.5
+
+    DetectionDatasetExportStage().run(
+        config,
+        output_dir,
+        context=_context_for(mask_qa_dir, output_dir),
+    )
+
+    train = json.loads((output_dir / "train" / "_annotations.coco.json").read_text(encoding="utf-8"))
+    valid = json.loads((output_dir / "valid" / "_annotations.coco.json").read_text(encoding="utf-8"))
+    assert [image["file_name"] for image in train["images"]] == ["000000.png", "000001.png"]
+    assert [image["file_name"] for image in valid["images"]] == [
+        "000002.png",
+        "000003.png",
+        "000004.png",
+        "000005.png",
+    ]
+    assert (output_dir / "train" / "000000.png").exists()
+    assert (output_dir / "valid" / "000002.png").exists()
 
 
 def test_video_input_extracts_rgb_frames_with_ffmpeg(tmp_path):
