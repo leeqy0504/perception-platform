@@ -1,0 +1,18 @@
+task_id: example_task
+pipeline: annotation_dataset
+runtime: server
+class_id: 0
+input:
+  rgbd_dir: ./tasks/example_task/
+  multi_views_dir: ./tasks/example_task/views/
+  first_frame: 0
+  # video_path: ./tasks/example_task/source.mp4
+  # frame_interval: 1
+sam2:
+  points: [[380, 182]]
+  labels: [1]
+detection_dataset:
+  class_name: object
+  class_id: 0
+  min_box_area: 16
+output_dir: output/

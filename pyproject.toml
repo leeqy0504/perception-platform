@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "annotation-dataset-pipeline"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+annotation-dataset = "pipeline.cli:main"
+pipeline = "pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pipeline*"]
+exclude = ["configs*", "registry*", "tasks*", "tests*", "tools*"]
