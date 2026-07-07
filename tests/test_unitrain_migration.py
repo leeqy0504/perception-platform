@@ -28,4 +28,6 @@ def test_unitrain_support_files_are_inside_unified_root():
     assert (ROOT / "envs" / "rfdetr.txt").exists()
     assert (ROOT / "envs" / "ultralytics.txt").exists()
     assert (ROOT / "weights").is_dir()
+    assert (ROOT / "weights" / ".gitkeep").exists()
+    assert not (ROOT / "weights" / "rf-detr-base.pth").exists()
     assert (ROOT / "run_unitrain.sh").exists()
