@@ -151,3 +151,79 @@ def test_setup_command_writes_annotation_dataset_task_without_multiviews(tmp_pat
     assert "rgbd_dir: ./tasks/mouse_001/" in task_yaml
     assert "multi_views_dir" not in task_yaml
     assert "real_size" not in task_yaml
+
+
+def test_annotation_to_unitrain_config_loads_training_preset_and_overrides(tmp_path):
+    task_dir = tmp_path / "tasks" / "mouse_001"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        """
+task_id: mouse_001
+pipeline: annotation_to_unitrain
+runtime: server
+class_id: 0
+input:
+  rgbd_dir: ./tasks/mouse_001/
+sam2:
+  points: [[10, 20]]
+  labels: [1]
+detection_dataset:
+  train_ratio: 0.7
+training: rfdetr_seg_nano
+training_overrides:
+  train:
+    epochs: 20
+    batch: 2
+    device: "cpu"
+output_dir: output/
+""",
+        encoding="utf-8",
+    )
+
+    config = load_config(str(task_dir / "task.yaml"), project_root=ROOT)
+
+    assert config.preset == "annotation_to_unitrain"
+    assert config.pipeline_stages == [
+        "prompt_mask",
+        "sam2_video_propagation",
+        "mask_qa",
+        "review_pack",
+        "detection_dataset_export",
+        "dataset_prepare",
+        "model_train",
+    ]
+    assert config.training_name == "rfdetr_seg_nano"
+    assert config.training["framework"] == "rfdetr"
+    assert config.training["model"] == "seg-nano"
+    assert config.training["task"] == "segment"
+    assert config.training["data"]["format"] == "coco"
+    assert config.training["train"]["epochs"] == 20
+    assert config.training["train"]["batch"] == 2
+    assert config.training["train"]["device"] == "cpu"
+
+
+def test_training_overrides_must_be_mapping(tmp_path):
+    task_dir = tmp_path / "tasks" / "bad_training"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        """
+task_id: bad_training
+pipeline: annotation_to_unitrain
+runtime: server
+input:
+  rgbd_dir: ./tasks/bad_training/
+sam2:
+  points: [[1, 2]]
+  labels: [1]
+training: rfdetr_seg_nano
+training_overrides: true
+""",
+        encoding="utf-8",
+    )
+
+    try:
+        load_config(str(task_dir / "task.yaml"), project_root=ROOT)
+    except Exception as exc:
+        assert "training_overrides must be a mapping" in str(exc)
+    else:
+        raise AssertionError("load_config should reject non-mapping training_overrides")

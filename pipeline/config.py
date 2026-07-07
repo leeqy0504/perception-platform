@@ -53,6 +53,8 @@ class PipelineConfig:
     input: InputConfig
     sam2: Sam2Config
     detection_dataset: DetectionDatasetConfig = field(default_factory=DetectionDatasetConfig)
+    training_name: str | None = None
+    training: dict[str, Any] = field(default_factory=dict)
     output_dir: str = "output/"
     run_id: str | None = None
     pipeline_stages: list[str] = field(default_factory=list)
@@ -135,6 +137,20 @@ def _load_named_yaml(base_dir: Path, name: str | None, required: bool = True) ->
     return _read_yaml(path)
 
 
+def _load_training_config(project_root: Path, raw: dict) -> tuple[str | None, dict]:
+    training_name = raw.get("training")
+    if not training_name:
+        return None, {}
+
+    training_data = _load_named_yaml(project_root / "configs" / "training", training_name)
+    overrides = raw.get("training_overrides", {})
+    if overrides is None:
+        overrides = {}
+    if not isinstance(overrides, dict):
+        raise ConfigError("training_overrides must be a mapping")
+    return str(training_name), _deep_merge(training_data, overrides)
+
+
 def _class_name_from_registry(project_root: Path, class_id: int | None) -> str | None:
     if class_id is None:
         return None
@@ -168,6 +184,11 @@ def _load_layered_config(path: Path, project_root: Path, raw: dict) -> dict:
 
     merged = _deep_merge(merged, runtime_data)
     merged = _deep_merge(merged, raw)
+
+    training_name, training_config = _load_training_config(project_root, raw)
+    if training_name:
+        merged["training_name"] = training_name
+        merged["training"] = training_config
 
     task_id = raw.get("task_id") or raw.get("task") or path.parent.name
     merged["task"] = task_id
@@ -258,6 +279,8 @@ def load_config(config_path: str, project_root: str | Path | None = None) -> Pip
             clip_size=det_data.get("clip_size"),
             train_ratio=det_data.get("train_ratio", 0.8),
         ),
+        training_name=resolved.get("training_name"),
+        training=resolved.get("training", {}),
         output_dir=resolved.get("output_dir", "output/"),
         run_id=resolved.get("run_id"),
         pipeline_stages=resolved.get("pipeline_stages", []),

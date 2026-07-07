@@ -1,0 +1,12 @@
+framework: rfdetr
+model: seg-nano
+task: segment
+data:
+  format: coco
+train:
+  epochs: 100
+  batch: 4
+  device: 0
+  output_dir: outputs
+export:
+  format: onnx

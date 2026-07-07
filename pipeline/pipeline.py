@@ -87,6 +87,8 @@ class PipelineOrchestrator:
             "input": config.input.__dict__,
             "sam2": config.sam2.__dict__,
             "detection_dataset": config.detection_dataset.__dict__,
+            "training_name": config.training_name,
+            "training": config.training,
             "output_dir": config.output_dir,
             "pipeline_stages": config.pipeline_stages,
             "runtime": config.runtime,
