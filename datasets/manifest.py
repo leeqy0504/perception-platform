@@ -43,6 +43,16 @@ def _validate_split(dataset_root: Path, split_name: str) -> tuple[dict[str, Any]
         if not image_path.exists():
             raise DatasetValidationError(f"Referenced image not found for split '{split_name}': {image_path}")
 
+    image_ids = {image.get("id") for image in images}
+    category_ids = {category.get("id") for category in categories}
+    for annotation in annotations:
+        image_id = annotation.get("image_id")
+        if image_id not in image_ids:
+            raise DatasetValidationError(f"Unknown image_id for split '{split_name}': {image_id}")
+        category_id = annotation.get("category_id")
+        if category_id not in category_ids:
+            raise DatasetValidationError(f"Unknown category_id for split '{split_name}': {category_id}")
+
     split_manifest = {
         "images_dir": str(split_dir),
         "annotations": str(annotations_path),

@@ -84,3 +84,55 @@ def test_prepare_dataset_manifest_rejects_missing_referenced_image(tmp_path):
         assert "000001.png" in str(exc)
     else:
         raise AssertionError("prepare_dataset_manifest should reject missing images")
+
+
+def test_prepare_dataset_manifest_rejects_unknown_annotation_image_id(tmp_path):
+    dataset_root = tmp_path / "detection_dataset_export"
+    output_dir = tmp_path / "dataset_prepare"
+    categories = [{"id": 0, "name": "object"}]
+    _write_split(dataset_root, "train", ["000000.png"], categories)
+    _write_split(dataset_root, "valid", ["000001.png"], categories)
+    annotations_path = dataset_root / "train" / "_annotations.coco.json"
+    coco = json.loads(annotations_path.read_text(encoding="utf-8"))
+    coco["annotations"][0]["image_id"] = 999
+    annotations_path.write_text(json.dumps(coco), encoding="utf-8")
+
+    try:
+        prepare_dataset_manifest(
+            dataset_root=dataset_root,
+            output_dir=output_dir,
+            task_name="mouse_001",
+            run_id=None,
+            source_stage="detection_dataset_export",
+        )
+    except DatasetValidationError as exc:
+        assert "Unknown image_id" in str(exc)
+        assert "999" in str(exc)
+    else:
+        raise AssertionError("prepare_dataset_manifest should reject unknown annotation image_id")
+
+
+def test_prepare_dataset_manifest_rejects_unknown_annotation_category_id(tmp_path):
+    dataset_root = tmp_path / "detection_dataset_export"
+    output_dir = tmp_path / "dataset_prepare"
+    categories = [{"id": 0, "name": "object"}]
+    _write_split(dataset_root, "train", ["000000.png"], categories)
+    _write_split(dataset_root, "valid", ["000001.png"], categories)
+    annotations_path = dataset_root / "train" / "_annotations.coco.json"
+    coco = json.loads(annotations_path.read_text(encoding="utf-8"))
+    coco["annotations"][0]["category_id"] = 123
+    annotations_path.write_text(json.dumps(coco), encoding="utf-8")
+
+    try:
+        prepare_dataset_manifest(
+            dataset_root=dataset_root,
+            output_dir=output_dir,
+            task_name="mouse_001",
+            run_id=None,
+            source_stage="detection_dataset_export",
+        )
+    except DatasetValidationError as exc:
+        assert "Unknown category_id" in str(exc)
+        assert "123" in str(exc)
+    else:
+        raise AssertionError("prepare_dataset_manifest should reject unknown annotation category_id")
