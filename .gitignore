@@ -44,3 +44,6 @@ logs/
 # Local development worktrees
 .worktrees
 .worktrees/
+
+vendors/
+weights/
