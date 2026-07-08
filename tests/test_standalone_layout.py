@@ -56,7 +56,7 @@ output_dir: output/
     assert config.detection_dataset.train_ratio == 0.8
 
 
-def test_only_annotation_dataset_runtime_stages_are_registered():
+def test_pipeline_runtime_stages_are_registered():
     assert set(list_stages()) == {
         "masks",
         "prompt_mask",
@@ -64,6 +64,7 @@ def test_only_annotation_dataset_runtime_stages_are_registered():
         "mask_qa",
         "review_pack",
         "detection_dataset_export",
+        "dataset_prepare",
     }
 
 

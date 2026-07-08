@@ -27,3 +27,4 @@ def list_stages():
 from pipeline.stages import masks  # noqa: E402,F401
 from pipeline.stages import sam2_video  # noqa: E402,F401
 from pipeline.stages import annotation_dataset  # noqa: E402,F401
+from pipeline.stages import training  # noqa: E402,F401
