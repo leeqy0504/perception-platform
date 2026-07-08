@@ -229,3 +229,37 @@ training_overrides: true
         assert "training_overrides must be a mapping" in str(exc)
     else:
         raise AssertionError("load_config should reject non-mapping training_overrides")
+
+
+def test_resolved_config_includes_training_block(tmp_path):
+    task_dir = tmp_path / "tasks" / "mouse_001"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        """
+task_id: mouse_001
+pipeline: annotation_to_unitrain
+runtime: server
+input:
+  rgbd_dir: ./tasks/mouse_001/
+sam2:
+  points: [[10, 20]]
+  labels: [1]
+training: rfdetr_seg_nano
+training_overrides:
+  train:
+    epochs: 3
+output_dir: output/
+""",
+        encoding="utf-8",
+    )
+    config = load_config(str(task_dir / "task.yaml"), project_root=ROOT)
+
+    from pipeline.pipeline import PipelineOrchestrator
+
+    orch = PipelineOrchestrator(project_root=ROOT)
+    path = orch._write_resolved_config(config)
+    text = Path(path).read_text(encoding="utf-8")
+
+    assert "training_name: rfdetr_seg_nano" in text
+    assert "framework: rfdetr" in text
+    assert "epochs: 3" in text

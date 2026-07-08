@@ -194,3 +194,47 @@ data:
 
 * `task: detect`：读取 `bbox`
 * `task: segment`：读取 `segmentation`
+
+## End-to-End UniTrain Pipeline
+
+当一个任务需要先生成标注数据集，再用 UniTrain 训练模型时，使用 `pipeline: annotation_to_unitrain`。
+
+任务配置示例：
+
+```yaml
+task_id: mouse_001
+pipeline: annotation_to_unitrain
+runtime: server
+class_id: 0
+input:
+  rgbd_dir: ./tasks/mouse_001/
+  video_path: ./tasks/mouse_001/source.mp4
+  frame_interval: 1
+sam2:
+  points: [[380, 182]]
+  labels: [1]
+detection_dataset:
+  class_name: object
+  class_id: 0
+  train_ratio: 0.8
+training: rfdetr_seg_nano
+training_overrides:
+  train:
+    epochs: 20
+    batch: 4
+    device: 0
+output_dir: output/
+```
+
+运行：
+
+```bash
+python -m pipeline.cli run --config tasks/mouse_001/task.yaml --force
+```
+
+最终结果位置：
+
+```text
+output/<task>/model_train/train_result.json
+output/<task>/manifest.json
+```
