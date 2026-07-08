@@ -176,6 +176,49 @@ def test_model_train_stage_writes_resolved_config_and_train_result(tmp_path, mon
     assert context.metadata["model_train"]["best_weights"] == train_result["best_weights"]
 
 
+def test_model_train_stage_accepts_rf_detr_alias_before_get_runner(tmp_path, monkeypatch):
+    task_dir = tmp_path / "tasks" / "mouse_001"
+    dataset_root = tmp_path / "run" / "detection_dataset_export"
+    dataset_prepare_dir = tmp_path / "run" / "dataset_prepare"
+    output_dir = tmp_path / "run" / "model_train"
+    _write_dataset_manifest(dataset_prepare_dir, dataset_root)
+    config = _config(task_dir)
+    config.training_name = "rfdetr_seg_nano"
+    config.training = {
+        "framework": "rf-detr",
+        "model": "seg-nano",
+        "task": "segment",
+        "data": {"format": "coco"},
+        "train": {"epochs": 1, "batch": 1, "device": "cpu", "output_dir": str(tmp_path / "train_outputs")},
+        "export": {"format": "onnx"},
+    }
+    context = StageContext(
+        run=RunContext(run_id="run42", task_name="mouse_001", metadata={}),
+        data=DataContext(
+            task_dir=task_dir,
+            run_dir=tmp_path / "run",
+            output_dir=output_dir,
+            inputs={"dataset_prepare": dataset_prepare_dir},
+        ),
+        stage_name="model_train",
+    )
+    frameworks = []
+
+    def record_get_runner(framework):
+        frameworks.append(framework)
+        return FakeRunner()
+
+    monkeypatch.setattr("pipeline.stages.training.get_runner", record_get_runner)
+
+    result = ModelTrainStage().run(config, output_dir, context=context)
+
+    assert result == output_dir
+    assert frameworks == ["rf-detr"]
+    train_result = json.loads((output_dir / "train_result.json").read_text(encoding="utf-8"))
+    assert train_result["framework"] == "rf-detr"
+    assert train_result["best_weights"].endswith("checkpoint_best_ema.pth")
+
+
 def test_model_train_stage_scopes_default_relative_training_output_dir(tmp_path, monkeypatch):
     task_dir = tmp_path / "tasks" / "mouse_001"
     dataset_root = tmp_path / "run" / "detection_dataset_export"
@@ -206,6 +249,43 @@ def test_model_train_stage_scopes_default_relative_training_output_dir(tmp_path,
     assert runner.config["train"]["output_dir"] == str(scoped_output_dir)
     assert Path(resolved["train"]["output_dir"]).is_absolute()
     assert resolved["train"]["output_dir"] != "outputs"
+
+
+def test_model_train_stage_defaults_missing_training_output_dir_to_unitrain(tmp_path, monkeypatch):
+    task_dir = tmp_path / "tasks" / "mouse_001"
+    dataset_root = tmp_path / "run" / "detection_dataset_export"
+    dataset_prepare_dir = tmp_path / "run" / "dataset_prepare"
+    output_dir = tmp_path / "run" / "model_train"
+    _write_dataset_manifest(dataset_prepare_dir, dataset_root)
+    config = _config(task_dir)
+    config.training_name = "rfdetr_seg_nano"
+    config.training = {
+        "framework": "rfdetr",
+        "model": "seg-nano",
+        "task": "segment",
+        "data": {"format": "coco"},
+        "train": {"epochs": 1, "batch": 1, "device": "cpu"},
+        "export": {"format": "onnx"},
+    }
+    context = StageContext(
+        run=RunContext(run_id="run42", task_name="mouse_001"),
+        data=DataContext(
+            task_dir=task_dir,
+            run_dir=tmp_path / "run",
+            output_dir=output_dir,
+            inputs={"dataset_prepare": dataset_prepare_dir},
+        ),
+        stage_name="model_train",
+    )
+    runner = FakeRunner()
+    monkeypatch.setattr("pipeline.stages.training.get_runner", lambda framework: runner)
+
+    ModelTrainStage().run(config, output_dir, context=context)
+
+    resolved = yaml.safe_load((output_dir / "resolved_unitrain_config.yaml").read_text(encoding="utf-8"))
+    default_output_dir = output_dir / "unitrain"
+    assert resolved["train"]["output_dir"] == str(default_output_dir)
+    assert runner.config["train"]["output_dir"] == str(default_output_dir)
 
 
 def test_model_train_stage_rejects_unsupported_framework_before_get_runner(tmp_path, monkeypatch):

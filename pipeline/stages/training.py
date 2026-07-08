@@ -116,7 +116,7 @@ class ModelTrainStage(BaseStage):
         if not framework:
             raise StageError("Training config missing required field: framework")
         framework_name = str(framework).lower()
-        if framework_name != "rfdetr":
+        if framework_name not in {"rfdetr", "rf-detr"}:
             raise StageError(
                 f"model_train currently supports framework 'rfdetr' only; "
                 f"'{framework}' requires a dataset conversion bridge"
