@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 from pipeline.config import load_config
 from pipeline.stages import list_stages
 
@@ -233,9 +235,10 @@ training_overrides: true
 
 def test_resolved_config_includes_training_block(tmp_path):
     task_dir = tmp_path / "tasks" / "mouse_001"
+    output_dir = tmp_path / "output"
     task_dir.mkdir(parents=True)
     (task_dir / "task.yaml").write_text(
-        """
+        f"""
 task_id: mouse_001
 pipeline: annotation_to_unitrain
 runtime: server
@@ -248,7 +251,7 @@ training: rfdetr_seg_nano
 training_overrides:
   train:
     epochs: 3
-output_dir: output/
+output_dir: {output_dir}
 """,
         encoding="utf-8",
     )
@@ -258,8 +261,10 @@ output_dir: output/
 
     orch = PipelineOrchestrator(project_root=ROOT)
     path = orch._write_resolved_config(config)
-    text = Path(path).read_text(encoding="utf-8")
+    resolved = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
 
-    assert "training_name: rfdetr_seg_nano" in text
-    assert "framework: rfdetr" in text
-    assert "epochs: 3" in text
+    assert Path(path) == output_dir / "mouse_001" / "resolved_config.yaml"
+    assert not (ROOT / "output" / "mouse_001" / "resolved_config.yaml").exists()
+    assert resolved["training_name"] == "rfdetr_seg_nano"
+    assert resolved["training"]["framework"] == "rfdetr"
+    assert resolved["training"]["train"]["epochs"] == 3
