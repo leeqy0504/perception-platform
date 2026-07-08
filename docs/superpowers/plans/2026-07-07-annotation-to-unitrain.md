@@ -644,7 +644,6 @@ def test_pipeline_runtime_stages_are_registered():
         "review_pack",
         "detection_dataset_export",
         "dataset_prepare",
-        "model_train",
     }
 ```
 
@@ -808,9 +807,26 @@ git commit -m "Add dataset prepare stage"
 
 **Files:**
 - Modify: `pipeline/stages/training.py`
+- Modify: `tests/test_standalone_layout.py`
 - Modify: `tests/test_training_stages.py`
 
 - [ ] **Step 1: Append failing model train tests**
+
+Update `test_pipeline_runtime_stages_are_registered` in `tests/test_standalone_layout.py` to include `"model_train"`:
+
+```python
+def test_pipeline_runtime_stages_are_registered():
+    assert set(list_stages()) == {
+        "masks",
+        "prompt_mask",
+        "sam2_video_propagation",
+        "mask_qa",
+        "review_pack",
+        "detection_dataset_export",
+        "dataset_prepare",
+        "model_train",
+    }
+```
 
 Append to `tests/test_training_stages.py`:
 
@@ -1018,6 +1034,7 @@ Run:
 
 ```bash
 git add pipeline/stages/training.py tests/test_training_stages.py
+git add tests/test_standalone_layout.py
 git commit -m "Add model train stage"
 ```
 
