@@ -1,6 +1,6 @@
-# 标注数据集流水线（Annotation Dataset Pipeline）
+# 感知平台（Perception Platform）
 
-一个仅提供 CLI（命令行）接口的工具包，用于根据 RGB 图像序列或视频输入和 SAM2 掩码生成 **COCO 格式目标检测与实例分割数据集**。
+一个部门内部的 CLI 工具包，用于根据 RGB 图像序列或视频输入和 SAM2 掩码生成 **COCO 格式目标检测与实例分割数据集**，并可继续通过 UniTrain 训练感知模型。
 
 ## 流水线执行内容
 
@@ -20,8 +20,10 @@
 
 ## 目录结构
 
+GitHub 仓库名为 `perception-platform`。本地目录名可以不同；下面以仓库名作为项目根目录示例：
+
 ```text
-annotation_dataset/
+perception-platform/
   configs/
     pipelines/annotation_dataset.yaml
     algorithms/sam2.yaml
@@ -127,13 +129,13 @@ output/<task_name>/runs/<run_id>/stages/
 
 ## SAM2 Docker 挂载
 
-`configs/algorithms/sam2.yaml` 默认假设项目在 SAM2 容器中的挂载路径为：
+建议将项目在 SAM2 容器中挂载到与仓库名一致的路径，例如：
 
 ```text
-/home/try/code/annotation_dataset
+/home/try/code/perception-platform
 ```
 
-请确保 `sam2.container` 指定的 Docker 容器将项目目录挂载到上述相同路径；如果挂载路径不同，请修改配置中的 `sam2.project_mount`。
+请确保 `sam2.container` 指定的 Docker 容器将项目目录挂载到 `sam2.project_mount` 配置的相同路径；如果容器中的实际挂载路径不同，请修改 `configs/algorithms/sam2.yaml` 或任务配置中的 `sam2.project_mount`。
 
 ## UniTrain COCO 输出
 
