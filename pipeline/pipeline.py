@@ -117,6 +117,9 @@ class PipelineOrchestrator:
         }
         run_dir = Path(self._run_dir(config))
         task_dir = Path(config.input.rgbd_dir)
+        metadata = manifest.metadata
+        if base_context and base_context.metadata:
+            metadata.update(base_context.metadata)
         run_context = RunContext(
             run_id=config.run_id,
             task_name=config.task,
@@ -125,7 +128,7 @@ class PipelineOrchestrator:
             job_id=(base_context.job_id if base_context else None) or config.run_id,
             stop_event=base_context.stop_event if base_context else None,
             progress_callback=base_context.progress_callback if base_context else None,
-            metadata=base_context.metadata if base_context else {},
+            metadata=metadata,
         )
         data_context = DataContext(
             task_dir=task_dir,
@@ -181,7 +184,15 @@ class PipelineOrchestrator:
             try:
                 result_path = stage.run(config, output_dir, context=stage_context)
                 elapsed = time.time() - start
-                manifest.mark_stage_done(stage_name, str(result_path), elapsed)
+                stage_metadata = {}
+                if stage_context.metadata.get(stage_name):
+                    stage_metadata = stage_context.metadata[stage_name]
+                manifest.mark_stage_done(
+                    stage_name,
+                    str(result_path),
+                    elapsed,
+                    metadata=stage_metadata,
+                )
                 print(f"[pipeline] {stage_name}: done ({elapsed:.1f}s)")
             except Exception as e:
                 manifest.mark_stage_failed(stage_name)
@@ -219,7 +230,15 @@ class PipelineOrchestrator:
         try:
             result_path = stage.run(config, output_dir, context=stage_context)
             elapsed = time.time() - start
-            manifest.mark_stage_done(stage_name, str(result_path), elapsed)
+            stage_metadata = {}
+            if stage_context.metadata.get(stage_name):
+                stage_metadata = stage_context.metadata[stage_name]
+            manifest.mark_stage_done(
+                stage_name,
+                str(result_path),
+                elapsed,
+                metadata=stage_metadata,
+            )
             print(f"[pipeline] {stage_name}: done ({elapsed:.1f}s)")
         except Exception as e:
             manifest.mark_stage_failed(stage_name)

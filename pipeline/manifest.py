@@ -29,12 +29,20 @@ class Manifest:
         self.stages: dict[str, dict] = {}
         self.metadata = metadata or {}
 
-    def mark_stage_done(self, name: str, output_dir: str, duration_s: float):
+    def mark_stage_done(
+        self,
+        name: str,
+        output_dir: str,
+        duration_s: float,
+        metadata: dict | None = None,
+    ):
         self.stages[name] = {
             "status": "done",
             "output_dir": output_dir,
             "duration_s": duration_s,
         }
+        if metadata:
+            self.stages[name]["metadata"] = metadata
 
     def mark_stage_failed(self, name: str):
         self.stages[name] = {
