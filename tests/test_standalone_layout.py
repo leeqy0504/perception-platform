@@ -174,6 +174,34 @@ Path({str(capture_path)!r}).write_text(json.dumps({{
     ]
 
 
+def test_public_help_commands_are_available():
+    commands = [
+        [sys.executable, "-m", "pipeline.cli", "--help"],
+        [sys.executable, "-m", "pipeline.cli", "run", "--help"],
+        [sys.executable, "-m", "pipeline.cli", "stage", "--help"],
+        [sys.executable, "-m", "pipeline.cli", "status", "--help"],
+        [sys.executable, "-m", "pipeline.cli", "setup", "--help"],
+        [sys.executable, "-m", "cli.train", "--help"],
+        [sys.executable, "-m", "cli.predict", "--help"],
+        [sys.executable, "-m", "cli.export", "--help"],
+        [sys.executable, "-m", "cli.eval", "--help"],
+        [str(ROOT / "run_annotation_dataset.sh"), "--help"],
+        [str(ROOT / "run_unitrain.sh"), "--help"],
+    ]
+
+    for command in commands:
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert result.returncode == 0, result.stderr
+        output = result.stdout + result.stderr
+        assert "--help" in output or "Usage:" in output or "用法:" in output
+
+
 def test_setup_command_writes_annotation_dataset_task_without_multiviews(tmp_path):
     task_dir = tmp_path / "tasks" / "mouse_001"
     task_dir.mkdir(parents=True)

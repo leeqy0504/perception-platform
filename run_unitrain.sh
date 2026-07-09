@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ============================================================================
 # UniTrain - 通用模型训练框架运行脚本
 # ============================================================================
@@ -17,13 +17,70 @@
 # 示例:
 #   ./run_unitrain.sh setup                        # 初始化所有环境
 #   ./run_unitrain.sh setup --framework rfdetr     # 仅初始化 RF-DETR 环境
-#   ./run_unitrain.sh train --config configs/rfdetr.yaml
-#   ./run_unitrain.sh predict --config configs/rfdetr.yaml --source image.jpg
+#   ./run_unitrain.sh train --config examples/train_yolo.yaml
+#   ./run_unitrain.sh predict --config examples/train_yolo.yaml --source image.jpg
 #   ./run_unitrain.sh shell --framework yolo       # 进入 YOLO 虚拟环境
 #
 # ============================================================================
 
 set -e
+
+show_help() {
+    echo "UniTrain - 通用模型训练框架"
+    echo ""
+    echo "用法: ./run_unitrain.sh <command> [options]"
+    echo ""
+    echo "命令:"
+    echo "  setup    [--framework <name>]              初始化环境"
+    echo "  train    --config <yaml>                   训练模型"
+    echo "  predict  --config <yaml> --source <path>   推理"
+    echo "  export   --config <yaml> [--format <fmt>]  导出模型"
+    echo "  eval     --config <yaml> --weights <path>  评估模型"
+    echo "  shell    --framework <name>                进入框架虚拟环境"
+    echo ""
+    echo "支持的框架:"
+    echo "  rfdetr, rf-detr    - RF-DETR 模型"
+    echo "  ultralytics, yolo  - Ultralytics YOLO 模型"
+    echo ""
+    echo "train 参数:"
+    echo "  --config <yaml>       UniTrain 配置文件 (必须)"
+    echo "  --convert-data        需要时强制 COCO 转 YOLO"
+    echo "  --skip-gpu-check      跳过训练前 GPU 显存检查"
+    echo "  --skip-eval           跳过训练后的自动评估"
+    echo ""
+    echo "predict/export/eval 参数:"
+    echo "  --source <path>       推理输入图片、视频或目录"
+    echo "  --format <fmt>        导出格式，覆盖 YAML 中的 export.format"
+    echo "  --weights <path>      评估权重路径，覆盖 YAML 中的 eval.weights"
+    echo "  --split <name>        评估数据集分割，覆盖 YAML 中的 eval.split"
+    echo "  --output-dir <dir>    评估结果输出目录"
+    echo ""
+    echo "示例:"
+    echo "  ./run_unitrain.sh setup                                      # 初始化所有环境"
+    echo "  ./run_unitrain.sh setup --framework rfdetr                   # 仅初始化 RF-DETR"
+    echo "  ./run_unitrain.sh train --config examples/train_yolo.yaml"
+    echo "  ./run_unitrain.sh predict --config examples/train_yolo.yaml --source image.jpg"
+    echo "  ./run_unitrain.sh export --config examples/train_yolo.yaml --format onnx"
+    echo "  ./run_unitrain.sh eval --config examples/train_yolo.yaml --weights outputs/.../best.pt"
+    echo "  ./run_unitrain.sh shell --framework yolo                     # 进入 YOLO 环境"
+}
+
+case "${1:-}" in
+    help|--help|-h)
+        show_help
+        exit 0
+        ;;
+    "")
+        show_help
+        exit 1
+        ;;
+esac
+
+if [ -z "${BASH_VERSION:-}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "Error: run_unitrain.sh requires Bash 4+ for setup/train/predict/export/eval." >&2
+    echo "Install a newer bash and run: bash ./run_unitrain.sh <command> [options]" >&2
+    exit 2
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -489,37 +546,6 @@ cmd_shell() {
 
     # 启动子 shell 并激活虚拟环境
     bash --rcfile <(echo "source $venv_path/bin/activate; PS1='($framework) \w\$ '")
-}
-
-show_help() {
-    echo "UniTrain - 通用模型训练框架"
-    echo ""
-    echo "用法: ./run_unitrain.sh <command> [options]"
-    echo ""
-    echo "命令:"
-    echo "  setup    [--framework <name>]              初始化环境"
-    echo "  train    --config <yaml>                   训练模型"
-    echo "  predict  --config <yaml> --source <path>   推理"
-    echo "  export   --config <yaml> [--format <fmt>]  导出模型"
-    echo "  eval     --config <yaml> --weights <path>  评估模型"
-    echo "  shell    --framework <name>                进入框架虚拟环境"
-    echo ""
-    echo "支持的框架:"
-    echo "  rfdetr, rf-detr    - RF-DETR 模型"
-    echo "  ultralytics, yolo  - Ultralytics YOLO 模型"
-    echo ""
-    echo "eval 参数:"
-    echo "  --config  <yaml>   配置文件 (必须)"
-    echo "  --weights <path>   评估权重路径 (可覆盖配置文件中的 eval.weights)"
-    echo "  --split   <name>   评估数据集分割 (val/test, 默认 val)"
-    echo "  --output-dir <dir> 评估结果输出目录"
-    echo ""
-    echo "示例:"
-    echo "  ./run_unitrain.sh setup                             # 初始化所有环境"
-    echo "  ./run_unitrain.sh setup --framework rfdetr          # 仅初始化 RF-DETR"
-    echo "  ./run_unitrain.sh train --config configs/rfdetr.yaml"
-    echo "  ./run_unitrain.sh eval --config configs/rfdetr.yaml --weights outputs/.../best.pth"
-    echo "  ./run_unitrain.sh shell --framework yolo            # 进入 YOLO 环境"
 }
 
 # ============================================================================

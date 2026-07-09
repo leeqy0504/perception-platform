@@ -7,9 +7,17 @@ from unitrain import get_runner, load_config
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Unified DL Prediction")
-    parser.add_argument("--config", "-c", required=True, help="Path to config YAML file")
-    parser.add_argument("--source", "-s", required=True, help="Image/video/directory to run inference on")
+    parser = argparse.ArgumentParser(
+        description="Unified DL prediction entry point.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  unitrain-predict --config examples/train_yolo.yaml --source image.jpg
+  unitrain-predict --config examples/train_yolo.yaml --source ./images/
+  unitrain-predict --config examples/train_yolo.yaml --source video.mp4
+""",
+    )
+    parser.add_argument("--config", "-c", required=True, help="Path to a UniTrain YAML config file")
+    parser.add_argument("--source", "-s", required=True, help="Image, video, or directory to run inference on")
     args = parser.parse_args()
 
     config = load_config(args.config)

@@ -2,8 +2,8 @@
 """Unified evaluation entry point.
 
 Usage:
-    python cli/eval.py --config configs/rfdetr.yaml
-    python cli/eval.py --config configs/rfdetr.yaml --weights outputs/.../best.pth
+    unitrain-eval --config examples/train_yolo.yaml --weights outputs/.../best.pt
+    python -m cli.eval --config examples/train_yolo.yaml --weights outputs/.../best.pt
 """
 
 import argparse
@@ -14,11 +14,19 @@ from unitrain import get_runner, load_config
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Unified Model Evaluation")
-    parser.add_argument("--config", "-c", required=True, help="Path to config YAML file")
-    parser.add_argument("--weights", "-w", default="", help="Override weights path (overrides config eval.weights)")
-    parser.add_argument("--split", "-s", default="", help="Override eval split (val/test)")
-    parser.add_argument("--output-dir", "-o", default="", help="Override eval output directory")
+    parser = argparse.ArgumentParser(
+        description="Unified model evaluation entry point.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  unitrain-eval --config examples/train_yolo.yaml --weights outputs/.../best.pt
+  unitrain-eval --config examples/train_yolo.yaml --weights outputs/.../best.pt --split val
+  unitrain-eval --config examples/train_yolo.yaml --weights outputs/.../best.pt --output-dir outputs/eval
+""",
+    )
+    parser.add_argument("--config", "-c", required=True, help="Path to a UniTrain YAML config file")
+    parser.add_argument("--weights", "-w", default="", help="Weights path; overrides eval.weights in YAML")
+    parser.add_argument("--split", "-s", default="", help="Dataset split to evaluate; overrides eval.split in YAML")
+    parser.add_argument("--output-dir", "-o", default="", help="Eval output directory; overrides eval.output_dir in YAML")
     parser.add_argument("--skip-report", action="store_true", help="Skip report generation (only run framework eval)")
     args = parser.parse_args()
 

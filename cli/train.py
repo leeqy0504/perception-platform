@@ -137,11 +137,19 @@ def prompt_clear_gpu_cache(gpu_status: dict) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Unified DL Training")
-    parser.add_argument("--config", "-c", required=True, help="Path to config YAML file")
-    parser.add_argument("--convert-data", action="store_true", help="Convert COCO to YOLO format if needed")
-    parser.add_argument("--skip-gpu-check", action="store_true", help="Skip GPU memory check")
-    parser.add_argument("--skip-eval", action="store_true", help="Skip auto-evaluation after training")
+    parser = argparse.ArgumentParser(
+        description="Unified DL training entry point.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  unitrain-train --config examples/train_yolo.yaml
+  unitrain-train --config examples/train_yolo.yaml --convert-data
+  unitrain-train --config examples/train_yolo.yaml --skip-gpu-check --skip-eval
+""",
+    )
+    parser.add_argument("--config", "-c", required=True, help="Path to a UniTrain YAML config file")
+    parser.add_argument("--convert-data", action="store_true", help="Force COCO-to-YOLO conversion when needed")
+    parser.add_argument("--skip-gpu-check", action="store_true", help="Skip the interactive GPU memory check")
+    parser.add_argument("--skip-eval", action="store_true", help="Skip automatic evaluation after training")
     args = parser.parse_args()
 
     config = load_config(args.config)

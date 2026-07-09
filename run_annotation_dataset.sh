@@ -15,10 +15,13 @@ Usage:
 
 Examples:
   ./run_annotation_dataset.sh --task mouse_001 --force
-  ./run_annotation_dataset.sh --config tasks/mouse_001/task.yaml
+  ./run_annotation_dataset.sh --config tasks/mouse_001/task.yaml --force
+  ./run_annotation_dataset.sh --config tasks/mouse_001/task.yaml -- annotation_to_unitrain
 
 The runner keeps the layered config layout:
   tasks/<task>/task.yaml -> configs/pipelines + configs/algorithms + configs/runtime + registry
+
+Arguments after "--" are passed to "python -m pipeline.cli run" as extra args.
 USAGE
 }
 

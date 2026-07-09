@@ -136,6 +136,69 @@ output/<task_name>/
 output/<task_name>/runs/<run_id>/stages/
 ```
 
+## CLI 命令速查
+
+安装后公开入口：
+
+| 命令 | 用途 |
+| --- | --- |
+| `perception-platform` / `pipeline` | 运行感知 pipeline，包括数据集制作和端到端训练 |
+| `annotation-dataset` / `annotation_dataset` | `pipeline` 的兼容别名 |
+| `unitrain-train` | 直接运行 UniTrain 训练配置 |
+| `unitrain-predict` | 使用 UniTrain 配置推理 |
+| `unitrain-export` | 导出模型 |
+| `unitrain-eval` | 评估模型 |
+| `run_annotation_dataset.sh` | 从源码目录运行 pipeline 的兼容脚本 |
+| `run_unitrain.sh` | 初始化隔离训练环境并调用 UniTrain 命令的兼容脚本 |
+
+Pipeline 命令以任务配置为中心：
+
+| 命令 | 参数 | 说明 |
+| --- | --- | --- |
+| `perception-platform run --config tasks/<task>/task.yaml --force` | `--config` | 任务 YAML，通常放在 `tasks/<task>/task.yaml` |
+| `perception-platform run annotation_to_unitrain --config tasks/<task>/task.yaml` | `preset` | 可选 positional 参数，会覆盖 YAML 解析出的 pipeline preset |
+| `perception-platform stage <stage> --config tasks/<task>/task.yaml --force` | `<stage>` | 只运行单个 stage，例如 `detection_dataset_export`、`dataset_prepare`、`model_train` |
+| `perception-platform status --config tasks/<task>/task.yaml` | `--config` | 读取该任务的 manifest 状态 |
+| `perception-platform setup --task <task>` | `--task` | 创建或更新 `tasks/<task>/task.yaml` |
+
+常用参数：
+
+| 参数 | 适用命令 | 含义 |
+| --- | --- | --- |
+| `--force` | `run` / `stage` | 即使已有输出也重新运行 |
+| `--pipeline` | `setup` | 写入任务配置的 pipeline id，默认 `annotation_dataset` |
+| `--runtime` | `setup` | 写入任务配置的 runtime id，默认 `server` |
+| `--class-id` | `setup` | 写入任务配置的类别 id，对应 `registry/classes.json` |
+| `--project-root` | `setup` | 指定包含 `tasks/` 和 `configs/` 的项目根目录 |
+
+UniTrain 命令直接读取 UniTrain 配置，不会自动生成 SAM2 标注数据集：
+
+| 命令 | 示例 | 说明 |
+| --- | --- | --- |
+| `unitrain-train` | `unitrain-train --config examples/train_yolo.yaml` | 训练模型；YOLO 可按需把 COCO 转成 YOLO 数据 |
+| `unitrain-predict` | `unitrain-predict --config examples/train_yolo.yaml --source image.jpg` | 对图片、视频或目录推理 |
+| `unitrain-export` | `unitrain-export --config examples/train_yolo.yaml --format onnx` | 导出模型；`--format` 覆盖 YAML 中的 `export.format` |
+| `unitrain-eval` | `unitrain-eval --config examples/train_yolo.yaml --weights outputs/.../best.pt` | 评估模型；`--weights` 覆盖 YAML 中的 `eval.weights` |
+
+`examples/` 中的 YAML 分为两类：task pipeline 配置模板需要复制或改写成 `tasks/<task>/task.yaml` 后运行；直接 UniTrain 配置可以交给 `unitrain-*` 命令，但其中的数据集路径必须已经存在。
+
+| 示例文件 | 类型 | 调用方式 |
+| --- | --- | --- |
+| `examples/dataset_only.yaml` | task pipeline 配置模板 | 复制/改成 `tasks/<task>/task.yaml` 后运行 `perception-platform run --config tasks/<task>/task.yaml --force` |
+| `examples/mixed_images_and_video.yaml` | task pipeline 配置模板 | 复制/改成任务配置，保留 `input.video_path` 后运行 pipeline |
+| `examples/end_to_end_rfdetr.yaml` | task pipeline 配置模板 | 复制/改成任务配置后运行 `perception-platform run --config tasks/<task>/task.yaml --force` |
+| `examples/end_to_end_yolo.yaml` | task pipeline 配置模板 | 复制/改成任务配置后运行 `perception-platform run --config tasks/<task>/task.yaml --force` |
+| `examples/train_yolo.yaml` | 直接 UniTrain 配置 | 确认 `data.path` 指向已有 COCO 数据集后运行 `unitrain-train --config examples/train_yolo.yaml` |
+
+源码脚本也支持查看帮助：
+
+```bash
+./run_annotation_dataset.sh --help
+./run_unitrain.sh --help
+python -m pipeline.cli --help
+python -m cli.train --help
+```
+
 ## SAM2 Docker 挂载
 
 建议将项目在 SAM2 容器中挂载到与仓库名一致的路径，例如：
@@ -254,13 +317,7 @@ training_overrides:
     device: 0
 ```
 
-更多可直接复制测试的配置在 `examples/`：
-
-* `dataset_only.yaml`：只生成 COCO 数据集。
-* `train_yolo.yaml`：只用 UniTrain/YOLO 训练已有 COCO 数据集。
-* `end_to_end_rfdetr.yaml`：数据集制作到 RF-DETR 训练。
-* `end_to_end_yolo.yaml`：数据集制作到 YOLO 训练。
-* `mixed_images_and_video.yaml`：同一目录下图片与视频混合输入。
+更多配置模板在 `examples/`，每个文件的调用方式见上面的“CLI 命令速查”。
 
 ```bash
 python -m pipeline.cli run --config tasks/mouse_001/task.yaml --force
